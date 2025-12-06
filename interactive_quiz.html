@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile-Optimized Quiz App</title>
+    <style>
+        /* Basic Reset and Mobile-First Layout */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Container Styles */
+        #quiz-container {
+            width: 100%;
+            max-width: 480px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.5s;
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .visible-content {
+            opacity: 1 !important;
+            height: auto !important;
+            pointer-events: auto !important;
+            padding-bottom: 24px;
+        }
+
+        /* Header */
+        .app-header {
+            background-color: #7d2a3c;
+            color: white;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+
+        /* Buttons */
+        button {
+            padding: 12px 8px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.15s, transform 0.15s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            font-size: 0.9rem;
+            width: 100%;
+        }
+        button:hover {
+            transform: scale(1.02);
+        }
+        #skip-btn { background-color: #ffc107; color: #333; }
+        #skip-btn:hover { background-color: #e0a800; }
+        #submit-btn { background-color: #28a745; color: white; font-size: 1.25rem; }
+        #submit-btn:hover { background-color: #1e7e34; }
+        #quit-btn { background-color: #dc3545; color: white; }
+        #quit-btn:hover { background-color: #bd2130; }
+        #hint-btn { background-color: #007bff; color: white; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; padding: 0;}
+        #hint-btn:hover { background-color: #0056b3; }
+
+        /* Input */
+        #answer-input {
+            width: calc(100% - 24px);
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            outline: none;
+        }
+        #answer-input:focus {
+            border-color: #007bff;
+        }
+
+        /* Status Tracker */
+        #status-tracker {
+            margin-top: 24px;
+            padding: 16px;
+            background-color: #343a40;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            transition: all 0.5s;
+            opacity: 0;
+            height: 0;
+            overflow: hidden;
+        }
+
+        /* Modal */
+        #startup-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        #startup-modal > div {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 90%;
+            width: 350px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        /* New Game Over Canvas Style */
+        #game-over-canvas {
+            display: none;
+            margin-top: 24px;
+            width: 100%;
+            max-width: 480px;
+            height: 300px;
+            background-color: #000;
+            color: #ff0000; /* Red for warning */
+            font-family: monospace;
+            font-size: 2rem;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 5px solid #ff0000;
+            border-radius: 8px;
+            font-weight: bold;
+            overflow: hidden; /* Ensure content doesn't overflow the canvas box */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main Application Container -->
+    <div id="quiz-container">
+        
+        <!-- Header/Title Bar (Includes the Hint button at the top right) -->
+        <div class="app-header">
+            <h1 id="program-title" style="font-size: 1.1rem; font-weight: 600;">Loading...</h1>
+            <button id="hint-btn" onclick="showHint()" title="Get a hint">?</button>
+        </div>
+
+        <!-- Quiz Content Area -->
+        <div style="padding: 20px;">
+            
+            <p id="question-title" style="font-size: 0.9rem; color: #6c757d; margin-bottom: 8px; text-align: center;"></p>
+            <p id="question-text" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 24px; text-align: center; color: #343a40;"></p>
+
+            <input type="text" id="answer-input" placeholder="Enter your answer here"
+                   onkeydown="if(event.key === 'Enter') document.getElementById('submit-btn').click();">
+
+            <!-- Action Buttons Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; margin-top: 20px;">
+                
+                <!-- Skip Button -->
+                <button id="skip-btn" onclick="skipQuestion()">Skip</button>
+
+                <!-- Submit Button -->
+                <button id="submit-btn" onclick="checkAnswer()">Submit</button>
+
+                <!-- Quit Button -->
+                <button id="quit-btn" onclick="handleQuitAttempt()">Quit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Canvas for alternating text/images -->
+    <div id="game-over-canvas"></div>
+    
+    <!-- Status/Score Tracker Dialog -->
+    <div id="status-tracker">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 8px;">Quiz Status</h2>
+        <p id="vigor-text" style="font-size: 1.75rem; font-weight: bolder; color: #28a745;">Vigor: 100%</p>
+        <p id="score-text" style="font-size: 0.875rem;">Correct Answers: 0</p>
+        <p id="message-area" style="margin-top: 12px; color: #ffc107; min-height: 18px;"></p>
+    </div>
+
+    <!-- STARTUP/GENERAL MODAL -->
+    <div id="startup-modal">
+        <div>
+            <h3 id="startup-modal-title" style="font-size: 1.25rem; font-weight: bold; margin-bottom: 16px; color: #343a40;"></h3>
+            <p id="startup-modal-message" style="margin-bottom: 24px; color: #495057;"></p>
+            
+            <!-- Console Input Area -->
+            <div id="console-input-area">
+                <input type="text" id="startup-input" placeholder="Type P1, P2, P3, why, no, or nah"
+                       style="width: calc(100% - 24px); padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; margin-bottom: 12px;">
+                <p id="startup-error" style="color: #dc3545; font-size: 0.875rem; margin-bottom: 12px; display: none;">Invalid input. Please try again.</p>
+                <button id="startup-submit-btn" onclick="processStartupInput()"
+                        style="background-color: #007bff; color: white; padding: 10px;">
+                    Submit Response
+                </button>
+            </div>
+            
+            <!-- Standard OK button for final results -->
+            <button id="standard-ok-btn" onclick="closeStartupModal();" 
+                    style="background-color: #007bff; color: white; padding: 10px; display: none;">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- QUIZ DATA STRUCTURES ---
+
+        const quizData1 = [
+            { question: "What was the capital of the Roman Empire?", answer: "Rome", answerAliases: ["The Eternal City"], hint: "It shares its name with the city you live in." },
+            { question: "Who wrote 'Romeo and Juliet'?", answer: "Shakespeare", answerAliases: ["William Shakespeare"], hint: "The Bard." },
+            { question: "What is the square root of 64?", answer: "8", answerAliases: ["eight"], hint: "It's an even single digit." },
+            { question: "In computing, what does CPU stand for?", answer: "Central Processing Unit", answerAliases: ["CPU"], hint: "It's the 'brain' of the computer." },
+            { question: "How many colors are in a rainbow?", answer: "7", answerAliases: ["seven"], hint: "Not 5, not 6." }
+        ];
+
+        const quizData2 = [
+            { question: "How many days are in a leap year?", answer: "366", answerAliases: ["three hundred sixty-six"], hint: "One more than a regular year." },
+            { question: "Which planet is known as the Red Planet?", answer: "Mars", answerAliases: [], hint: "It shares its name with a candy bar." },
+            { question: "What is the largest land animal?", answer: "Elephant", answerAliases: [], hint: "It has a very long nose." },
+            { question: "How many sides does a hexagon have?", answer: "6", answerAliases: ["six"], hint: "It's a single digit number." },
+            { question: "Who painted the Mona Lisa?", answer: "Leonardo da Vinci", answerAliases: ["Da Vinci", "Leonardo"], hint: "One of the Teenage Mutant Ninja Turtles." }
+        ];
+
+        const quizLibrary = [
+            { question: "What is the capital of France?", answer: "Paris", answerAliases: [], hint: "It starts with 'P' and rhymes with 'clarence'." },
+            { question: "What is the largest organ in the human body?", answer: "Skin", answerAliases: [], hint: "It covers everything." },
+            { question: "Which fictional city is the home of Batman?", answer: "Gotham City", answerAliases: ["Gotham"], hint: "It sounds like a dark version of heaven." },
+            { question: "How many minutes are in a full day?", answer: "1440", answerAliases: ["one thousand four hundred forty"], hint: "Multiply 24 by 60." },
+            { question: "What gas do plants absorb from the atmosphere?", answer: "Carbon Dioxide", answerAliases: ["CO2"], hint: "The stuff we breathe out." },
+            { question: "What is the main ingredient in guacamole?", answer: "Avocado", answerAliases: [], hint: "It's green and healthy." },
+            { question: "What is the chemical symbol for gold?", answer: "Au", answerAliases: ["gold"], hint: "The element symbol is two letters." },
+            { question: "Who discovered penicillin?", answer: "Alexander Fleming", answerAliases: ["Fleming"], hint: "His first name is Alexander." },
+            { question: "What is the fastest animal on land?", answer: "Cheetah", answerAliases: [], hint: "A spotted cat." },
+            { question: "What is the smallest country in the world?", answer: "Vatican City", answerAliases: ["Vatican"], hint: "It's located inside Rome." },
+            { question: "Which famous ship sank in 1912?", answer: "Titanic", answerAliases: [], hint: "A very famous movie was made about it." },
+            { question: "What is the process called when liquid turns into gas?", answer: "Evaporation", answerAliases: [], hint: "It happens to puddles on a hot day." }
+        ];
+
+        // --- GLOBAL STATE ---
+        let currentQuizSet = []; 
+        let currentQuestionIndex = 0;
+        let correctCount = 0;
+        let vigor = 100;
+        let quitAttemptCount = 0;
+        let isQuizStarted = false;
+        let totalQuestions = 0; 
+        let currentProgramId = 'p1';
+        let gameOverLoopId; 
+
+        // --- Vigor Configuration (DYNAMIC RULES) ---
+        const VIGOR_INCORRECT_PENALTY = 5;
+        const VIGOR_GAME_OVER_LEVEL = 0;
+
+        const VIGOR_CONFIG = {
+            // P1/P2: Auto-Skip @ 30%, Skip cost 20%
+            'p1': { skipPenalty: 20, autoSkipFloor: 30, skipText: "Skip (-20%)" },
+            'p2': { skipPenalty: 20, autoSkipFloor: 30, skipText: "Skip (-20%)" },
+            // P3: Auto-Skip @ 20%, Skip cost 12.5%
+            'p3': { skipPenalty: 12.5, autoSkipFloor: 20, skipText: "Skip (-12.5%)" } 
+        };
+
+        // --- DOM ELEMENTS ---
+        const quizContainerEl = document.getElementById('quiz-container');
+        const statusTrackerEl = document.getElementById('status-tracker');
+        const programTitleEl = document.getElementById('program-title');
+        const questionTitleEl = document.getElementById('question-title');
+        const questionTextEl = document.getElementById('question-text');
+        const answerInputEl = document.getElementById('answer-input');
+        const vigorTextEl = document.getElementById('vigor-text');
+        const scoreTextEl = document.getElementById('score-text');
+        const messageAreaEl = document.getElementById('message-area');
+        const quitBtnEl = document.getElementById('quit-btn');
+        const skipBtnEl = document.getElementById('skip-btn');
+        const gameOverCanvasEl = document.getElementById('game-over-canvas'); 
+        
+        const startupModalEl = document.getElementById('startup-modal');
+        const startupTitleEl = document.getElementById('startup-modal-title');
+        const startupMessageEl = document.getElementById('startup-modal-message');
+        const startupInputEl = document.getElementById('startup-input');
+        const startupErrorEl = document.getElementById('startup-error');
+        const consoleInputArea = document.getElementById('console-input-area');
+        const standardOkBtnEl = document.getElementById('standard-ok-btn');
+
+        // --- Game Over Logic (Flashing Text/Image) ---
+        
+        // Font size reduced to 6px for mobile visibility of the wide ASCII art.
+        const systemArt = 
+            '<pre style="line-height:1;margin:0;font-size: 6px;">/$$$$$$$$                      /$$                                    \n| $$_____/                     | $$                                    \n| $$     /$$$$$$  /$$$$$$/$$$$ | $$$$$$$   /$$$$$$  /$$   /$$  /$$$$$$$\n| $$$$$ /$$__  $$| $$_  $$_  $$| $$__  $$ /$$__  $$| $$  | $$ /$$_____/\n| $$__/| $$$$$$$$| $$ \\ $$ \\ $$| $$  \\ $$| $$  \\ $$| $$  | $$|  $$$$$$\n| $$   | $$_____/| $$ | $$ | $$| $$  | $$| $$  | $$| $$  | $$ \\____  $$\n| $$   |  $$$$$$$| $$ | $$ | $$| $$$$$$$/|  $$$$$$/|  $$$$$$$ /$$$$$$$/\n|__/    \\_______/|__/ |__/ |__/|_______/  \______/  \____  $$|_______/ \n                                                    /$$  | $$\n                                                   |  $$$$$$/\n                                                    \\______/</pre>';
+
+        // Font size reduced to 6px for mobile visibility of the wide ASCII art.
+        const failureArt = 
+            '<pre style="line-height:1;margin:0;font-size: 6px;">/$$$$$$$            /$$           /$$\n| $$__  $$          | $$          | $$\n| $$  \\ $$ /$$   /$$| $$  /$$$$$$ | $$\n| $$$$$$$/| $$  | $$| $$ /$$__  $$| $$\n| $$__  $$| $$  | $$| $$| $$$$$$$$|__/\n| $$  \\ $$| $$  | $$| $$| $$_____/    \n| $$  | $$|  $$$$$$/| $$|  $$$$$$$ /$$\n|__/  |__/ \______/ |__/ \_______/|__/</pre>';
+
+        const gameOverStates = [systemArt, failureArt];
+        
+        let currentStateIndex = 0;
+
+        function startGameOverAnimation() {
+            // Hide the main quiz UI
+            quizContainerEl.style.opacity = '0';
+            quizContainerEl.style.height = '0';
+            statusTrackerEl.style.opacity = '0';
+            statusTrackerEl.style.height = '0';
+            
+            // Show the Game Over display
+            gameOverCanvasEl.style.display = 'flex';
+
+            // Start the flashing loop (750ms = 3/4 sec)
+            gameOverLoopId = setInterval(() => {
+                gameOverCanvasEl.innerHTML = gameOverStates[currentStateIndex];
+                currentStateIndex = (currentStateIndex + 1) % gameOverStates.length;
+            }, 750);
+
+            showStartupModal("System Failure", "Vigor reached 0%! Your session has been terminated. Press Restart to try again.", false);
+            standardOkBtnEl.onclick = () => window.location.reload();
+        }
+
+        function stopGameOverAnimation() {
+            if (gameOverLoopId) {
+                clearInterval(gameOverLoopId);
+                gameOverLoopId = null;
+                gameOverCanvasEl.style.display = 'none';
+                gameOverCanvasEl.innerHTML = '';
+            }
+        }
+
+        // --- Utility Functions ---
+
+        function getRandomQuizSet(library, count) {
+            if (count > library.length) count = library.length;
+            const shuffled = [...library].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
+        }
+
+        // --- Vigor and Score Management ---
+        
+        function updateVigor(change) {
+            vigor = Math.max(VIGOR_GAME_OVER_LEVEL, vigor + change);
+            
+            const color = vigor > 75 ? '#28a745' : vigor > 40 ? '#ffc107' : '#dc3545';
+            vigorTextEl.style.color = color;
+            vigorTextEl.textContent = `Vigor: ${Math.floor(vigor)}%`;
+
+            const currentFloor = VIGOR_CONFIG[currentProgramId].autoSkipFloor;
+
+            if (vigor <= VIGOR_GAME_OVER_LEVEL) {
+                endQuiz(false, true); // Vigor loss game over
+            } else if (vigor <= currentFloor && isQuizStarted) {
+                // Auto-skip logic
+                showMessage(`Vigor dangerously low (${Math.floor(vigor)}% - Auto-Skip Threshold: ${currentFloor}%). Question skipped!`, "red");
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    loadQuestion();
+                }, 1500);
+            }
+        }
+
+        function updateScoreDisplay() {
+            scoreTextEl.textContent = `Correct Answers: ${correctCount}`;
+            updateVigor(0);
+        }
+
+        // --- Console/Modal Logic ---
+
+        const initialPrompt = `
+            Welcome! Select a quiz program to begin:
+            <ul style="list-style: disc; margin-left: 20px; margin-top: 12px; font-size: 0.9rem; color: #495057;">
+                <li><span style="font-family: monospace;">P1</span>: Standard (Auto-Skip @ 30%, Skip cost 20%)</li>
+                <li><span style="font-family: monospace;">P2</span>: Standard (Auto-Skip @ 30%, Skip cost 20%)</li>
+                <li><span style="font-family: monospace;">P3</span>: Hard Mode (Auto-Skip @ 20%, Skip cost 12.5%)</li>
+            </ul>
+            <p style="font-weight: bold; margin-top: 16px;">Accepted responses (P1/P2/P3/why/no/nah):</p>
+        `;
+
+        function showStartupModal(title, message, showInput) {
+            startupTitleEl.innerHTML = title;
+            startupMessageEl.innerHTML = message;
+            
+            consoleInputArea.style.display = showInput ? 'block' : 'none';
+            standardOkBtnEl.style.display = showInput ? 'none' : 'block';
+            
+            startupModalEl.style.display = 'flex';
+        }
+
+        function closeStartupModal() {
+            startupModalEl.style.display = 'none';
+        }
+
+        function processStartupInput() {
+            const input = startupInputEl.value.trim().toLowerCase();
+            startupErrorEl.style.display = 'none';
+
+            if (input === 'p1' || input === 'p2' || input === 'p3') {
+                currentProgramId = input;
+                let selectedProgram = input;
+
+                if (selectedProgram === 'p1') { currentQuizSet = quizData1; } 
+                else if (selectedProgram === 'p2') { currentQuizSet = quizData2; } 
+                else if (selectedProgram === 'p3') { currentQuizSet = getRandomQuizSet(quizLibrary, 10); }
+
+                if (currentQuizSet.length > 0) {
+                    totalQuestions = currentQuizSet.length;
+                    closeStartupModal();
+                    startQuiz(`Program ${selectedProgram.toUpperCase()} (${totalQuestions} Questions)`);
+                } else {
+                    showStartupModal("Error", "Selected program is empty or failed to load questions.", false);
+                }
+            } 
+            else if (['no', 'nah'].includes(input)) {
+                showStartupModal("Quiz Closed", "You chose not to start the quiz. Refresh the page to try again.", false);
+                standardOkBtnEl.onclick = () => window.location.reload();
+            } 
+            else if (input === 'why') {
+                showStartupModal(
+                    "Why the Quiz Programs?", 
+                    "P1 and P2 use the standard Vigor rules (Auto-skip at 30%, Skip costs 20%). P3 is the Hard Mode program with stricter rules (Auto-skip at 20%, Skip costs 12.5%). Choose a program (P1, P2, P3) to begin.", 
+                    true 
+                );
+            } else {
+                startupErrorEl.textContent = `Invalid input: '${input}'. Please type P1, P2, P3, 'why', 'no', or 'nah'.`;
+                startupErrorEl.style.display = 'block';
+            }
+        }
+        
+        function askForStartupConfirmation() {
+            showStartupModal("Welcome to the Multi-Program Quiz!", initialPrompt, true);
+        }
+        
+        // --- Quiz Flow Functions ---
+
+        function startQuiz(programName) {
+            // Ensure any previous game over animation is stopped
+            stopGameOverAnimation();
+            
+            // Reset state
+            correctCount = 0;
+            currentQuestionIndex = 0;
+            vigor = 100;
+
+            quizContainerEl.classList.add('visible-content');
+            statusTrackerEl.classList.add('visible-content');
+            isQuizStarted = true;
+            programTitleEl.textContent = programName;
+            
+            // Update the Skip button text
+            skipBtnEl.textContent = VIGOR_CONFIG[currentProgramId].skipText;
+
+            updateScoreDisplay();
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (!isQuizStarted) return;
+
+            if (currentQuestionIndex >= totalQuestions) {
+                endQuiz();
+                return;
+            }
+
+            const q = currentQuizSet[currentQuestionIndex];
+            
+            questionTitleEl.textContent = `Question ${currentQuestionIndex + 1}/${totalQuestions}`;
+            questionTextEl.textContent = q.question;
+            answerInputEl.value = '';
+            answerInputEl.disabled = false;
+            
+            quitAttemptCount = 0;
+            quitBtnEl.textContent = 'Quit';
+            quitBtnEl.style.backgroundColor = '#dc3545';
+            quitBtnEl.style.color = 'white';
+            showMessage('', 'transparent');
+            answerInputEl.focus();
+        }
+
+        function checkAnswer() {
+            if (!isQuizStarted) return;
+
+            const userAnswer = answerInputEl.value.trim().toLowerCase();
+            const q = currentQuizSet[currentQuestionIndex];
+            
+            const isCorrect = userAnswer === q.answer.toLowerCase() || 
+                              (q.answerAliases && q.answerAliases.map(a => a.toLowerCase()).includes(userAnswer));
+
+            if (!userAnswer) {
+                showMessage("Please enter an answer before submitting.", "red");
+                return;
+            }
+
+            if (isCorrect) {
+                correctCount++;
+                showMessage(`Correct! The answer was ${q.answer}.`, "green");
+                currentQuestionIndex++;
+                updateScoreDisplay();
+                setTimeout(loadQuestion, 1500); 
+            } else {
+                updateVigor(-VIGOR_INCORRECT_PENALTY);
+                showMessage(`Incorrect. Vigor decreased by ${VIGOR_INCORRECT_PENALTY}%. Try again or Skip.`, "red");
+            }
+        }
+        
+        function skipQuestion() {
+            if (!isQuizStarted) return;
+            
+            const penalty = VIGOR_CONFIG[currentProgramId].skipPenalty;
+
+            updateVigor(-penalty);
+            
+            showMessage(`Question skipped. Vigor reduced by ${penalty}%.`, "orange");
+            currentQuestionIndex++;
+            updateScoreDisplay();
+            setTimeout(loadQuestion, 1500); 
+        }
+
+        function handleQuitAttempt() {
+            if (!isQuizStarted) return;
+
+            quitAttemptCount++;
+            
+            if (quitAttemptCount === 1) {
+                quitBtnEl.textContent = 'Quit? (Again)';
+                quitBtnEl.style.backgroundColor = '#ffc107';
+                quitBtnEl.style.color = '#333';
+                showMessage("Warning: Press 'Quit? (Again)' to confirm exit.", "orange");
+            } else if (quitAttemptCount >= 2) {
+                endQuiz(true);
+            }
+        }
+        
+        function showHint() {
+            if (!isQuizStarted) return;
+            const hint = currentQuizSet[currentQuestionIndex].hint;
+            showMessage("Hint: " + hint, "blue");
+        }
+
+        function showMessage(msg, color) {
+            messageAreaEl.style.color = color;
+            messageAreaEl.textContent = msg;
+        }
+
+        function endQuiz(isQuit = false, isVigorLoss = false) {
+            isQuizStarted = false;
+            stopGameOverAnimation(); // Stop the flashing animation if it's running
+
+            const percentage = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+            let finalTitle = "Quiz Complete!";
+            let feedback = "";
+
+            if (isVigorLoss) {
+                startGameOverAnimation(); // Start the new flashing sequence
+                return;
+            }
+            
+            if (isQuit) {
+                finalTitle = "Quiz Exited";
+                feedback = "You ended the quiz early. ";
+            }
+
+            feedback += `Your final score was **${correctCount} out of ${totalQuestions}** correct answers (${percentage.toFixed(0)}%). `;
+
+            if (percentage >= 80) {
+                feedback += `🎉 **Congratulations!** You achieved an excellent score!`;
+            } else if (percentage >= 50) {
+                feedback += `👍 **Well Done!** A solid performance, keep practicing!`;
+            } else {
+                feedback += `😟 **Shame.** Looks like you might need to brush up on your trivia!`;
+            }
+
+            showStartupModal(finalTitle, feedback, false);
+            standardOkBtnEl.textContent = "Restart";
+            standardOkBtnEl.onclick = () => window.location.reload();
+        }
+        
+        document.addEventListener('DOMContentLoaded', askForStartupConfirmation);
+
+    </script>
+</body>
+</html>
